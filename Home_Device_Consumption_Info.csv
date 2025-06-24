@@ -1,0 +1,13 @@
+Appliance,Power Wattage (W) - min,Power Wattage (W) - max,Usage Hours (per day),Energy Consumption (Wh)
+Refrigerator,100,600,24,2400-14400
+Washing Machine,500,2500,1,500-2500
+Oven,1000,5000,1.5,1500-7500
+Microwave Oven,600,1500,0.5,300-750
+Dishwasher,1200,2400,1,1200-2400
+Television,50,400,4,200-1600
+Vacuum Cleaner,500,2000,0.5,250-1000
+Air Conditioner,800,5000,6,4800-30000
+Heater,500,1500,4,2000-6000
+Coffee Maker,600,1200,0.5,300-600
+Toaster,800,1500,0.25,200-375
+Blender,300,1000,0.5,150-500
