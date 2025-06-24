@@ -100,7 +100,7 @@ class SmartHomeScheduler:
         # MODIFIED: Create individual: 4 device starts + 24 battery modes + 1 EV start = 29 genes
         individual_components = tuple(self.toolbox.__getattribute__(f"start_time_{device}") for device in CELs) + \
                                tuple([self.toolbox.battery_mode] * 24) + \
-                               (self.toolbox.ev_start,)
+                                (self.toolbox.ev_start,)
         self.toolbox.register("individual", tools.initCycle, creator.Individual, individual_components, n=1)
 
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
@@ -477,7 +477,7 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
     start_times_data = np.array(solutions)
     for i, device in enumerate(CELs):
         plt.hist(start_times_data[:, i], bins=range(0, 25), alpha=0.5, 
-                 label=device, edgecolor='black')
+                label=device, edgecolor='black')
     plt.xlabel('Start Time (Hour)')
     plt.ylabel('Frequency')
     plt.title('Appliance Start Times Distribution')
