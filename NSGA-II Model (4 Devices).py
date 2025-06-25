@@ -5,7 +5,8 @@ import random
 from deap import algorithms, base, creator, tools
 import matplotlib.pyplot as plt
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 # Problem Parameters
 T = range(24)  # 24-hour scheduling period
@@ -17,47 +18,225 @@ T_i = 0
 T_f = 23
 
 # Renewable Energy Generation and Costs
-P_sun = np.array([0.0, 0.0, 0.0,0.0,0.0,0.0,0.1,0.2,0.3,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.3,0.2,0.1,0.0,0.0,0.0,0.0,0.0])  # 24 hours
-P_wind = np.array([0.3, 0.3, 0.3,0.3,0.3,0.3,0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.2,0.3,0.3,0.3,0.3,0.3,0.3])  # 24 hours
-P_re = P_sun + P_wind
-C_re = np.array([0.15, 0.20] * 12)  # 24 hours
+P_sun_base = np.array(
+    [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.3,
+        0.2,
+        0.1,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+)
+P_wind_base = np.array(
+    [
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.2,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.2,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+    ]
+)
 
+C_re_base = np.array(
+    [
+        0.18,
+        0.18,
+        0.18,
+        0.18,
+        0.17,
+        0.17,  # Early morning (midnight to 6 AM) - wind only, slightly higher
+        0.10,
+        0.08,
+        0.07,
+        0.06,
+        0.06,
+        0.06,  # Morning sunlight (6 AM – noon) - high solar, lower cost
+        0.06,
+        0.06,
+        0.07,
+        0.08,
+        0.10,
+        0.12,  # Afternoon – solar declines
+        0.14,
+        0.16,
+        0.17,
+        0.18,
+        0.18,
+        0.18,  # Evening – mostly wind again, cost increases slightly
+    ]
+)
 # Grid Cost and Selling Price
-C_grid = np.array([0.25, 0.20, 0.18, 0.15, 0.12, 0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.07, 0.10, 0.13, 0.16, 0.18, 0.20, 0.22, 0.25, 0.23, 0.21, 0.19, 0.17])
-R_sell = np.array([0.20, 0.15, 0.25, 0.05, 0.20, 0.06, 0.08, 0.10, 0.20, 0.10, 0.08, 0.20, 0.15, 0.12, 0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.18, 0.16, 0.14, 0.12])
-
+C_grid_base = np.array(
+    [
+        0.25,
+        0.20,
+        0.18,
+        0.15,
+        0.12,
+        0.10,
+        0.09,
+        0.08,
+        0.07,
+        0.06,
+        0.05,
+        0.04,
+        0.07,
+        0.10,
+        0.13,
+        0.16,
+        0.18,
+        0.20,
+        0.22,
+        0.25,
+        0.23,
+        0.21,
+        0.19,
+        0.17,
+    ]
+)
+R_sell_base = np.array(
+    [
+        0.20,
+        0.15,
+        0.25,
+        0.05,
+        0.20,
+        0.06,
+        0.08,
+        0.10,
+        0.20,
+        0.10,
+        0.08,
+        0.20,
+        0.15,
+        0.12,
+        0.10,
+        0.12,
+        0.14,
+        0.16,
+        0.18,
+        0.20,
+        0.18,
+        0.16,
+        0.14,
+        0.12,
+    ]
+)
 # Non-controllable Load
-Pncl = np.array([1.5, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2, 0.1, 0.5, 0.8, 1.0, 1.3, 1.5, 1.7, 1.6, 1.4, 1.2, 1.0])
+Pncl_base = np.array(
+    [
+        1.5,
+        1.2,
+        1.0,
+        0.9,
+        0.8,
+        0.7,
+        0.6,
+        0.5,
+        0.4,
+        0.3,
+        0.2,
+        0.1,
+        0.2,
+        0.1,
+        0.5,
+        0.8,
+        1.0,
+        1.3,
+        1.5,
+        1.7,
+        1.6,
+        1.4,
+        1.2,
+        1.0,
+    ]
+)
+
+# Stochastic Mode
+USE_STOCHASTIC_INPUTS = True  # Set to False to use original fixed values
+
+
+if USE_STOCHASTIC_INPUTS:
+    np.random.seed()  # Optional: remove seed for full randomness
+
+    # Add Gaussian noise (mean=0, std=0.03) and clip to non-negative
+    P_sun = np.clip(P_sun_base + np.random.normal(0, 0.03, size=24), 0, 1)
+    P_wind = np.clip(P_wind_base + np.random.normal(0, 0.03, size=24), 0, 1)
+
+    # For costs, allow ±10% fluctuation
+    C_grid = np.clip(
+        C_grid_base * (1 + np.random.uniform(-0.1, 0.1, size=24)), 0.01, 1.0
+    )
+    R_sell = np.clip(
+        R_sell_base * (1 + np.random.uniform(-0.1, 0.1, size=24)), 0.01, 1.0
+    )
+    # Add randomness to non-controllable load: ±10% noise
+    Pncl = np.clip(Pncl_base * (1 + np.random.normal(0, 0.1, size=24)), 0.1, 5.0)
+    C_re = np.clip(C_re_base * (1 + np.random.uniform(-0.1, 0.1, size=24)), 0.01, 1.0)
+
+else:
+    P_sun = P_sun_base
+    P_wind = P_wind_base
+    C_grid = C_grid_base
+    R_sell = R_sell_base
+    Pncl = Pncl_base
+    C_re = C_re_base
+
+P_re = P_sun + P_wind
 
 # Device parameters
-Tcli = {
-    "Washing Machine": 1, "Dryer": 5, 
-    "Dishwasher": 7, "Oven": 9
-    }
+Tcli = {"Washing Machine": 1, "Dryer": 5, "Dishwasher": 7, "Oven": 9}
 
-Tclf = {
-    "Washing Machine": 8, "Dryer": 11, 
-    "Dishwasher": 10, "Oven": 13
-    }
+Tclf = {"Washing Machine": 8, "Dryer": 11, "Dishwasher": 10, "Oven": 13}
 
-Pcl = {
-    "Washing Machine": 1.0, "Dryer": 0.8, 
-    "Dishwasher": 0.6, "Oven": 1.2
-    }
+Pcl = {"Washing Machine": 1.0, "Dryer": 0.8, "Dishwasher": 0.6, "Oven": 1.2}
 
-Duration = {
-    "Washing Machine": 3, "Dryer": 1, 
-    "Dishwasher": 2, "Oven": 1
-    }
+Duration = {"Washing Machine": 3, "Dryer": 1, "Dishwasher": 2, "Oven": 1}
 
-Precedence = {
-    "Dryer": "Washing Machine"
-    }
+Precedence = {"Dryer": "Washing Machine"}
 
 
 # System Constants
 lambdaa = 2  # MODIFIED: Max CELs connected simultaneously (reduced from 5 to 4)
-gamma = 20   # Max load from CELs
+gamma = 20  # Max load from CELs
 
 # Battery Parameters
 E_b_init = 5.0
@@ -74,22 +253,35 @@ EV_CHARGING_RATE = 2.0  # Fixed charging rate in kW
 P_grid_max = 20
 P_sell_max = 4.0
 
+
 # SmartHomeScheduler Class
 class SmartHomeScheduler:
     def __init__(self):
         self.setup_deap()
 
+    # initializes DEAP GA components
     def setup_deap(self):
         """Setup DEAP framework for NSGA-II"""
         # Create fitness class with feasibility flag
-        creator.create("FitnessMulti", base.Fitness, weights=(-1.0, -1.0), crowding_dist=2.0, feasible=True)
+        creator.create(
+            "FitnessMulti",
+            base.Fitness,
+            weights=(-1.0, -1.0),
+            crowding_dist=2.0,
+            feasible=True,
+        )
         creator.create("Individual", list, fitness=creator.FitnessMulti)
 
         self.toolbox = base.Toolbox()
 
         # Device start times
         for device in CELs:
-            self.toolbox.register(f"start_time_{device}", random.randint, Tcli[device], Tclf[device] - Duration[device] + 1)
+            self.toolbox.register(
+                f"start_time_{device}",
+                random.randint,
+                Tcli[device],
+                Tclf[device] - Duration[device] + 1,
+            )
 
         # Battery mode: discrete (0=discharge, 0.5=idle, 1=charge)
         self.toolbox.register("battery_mode", random.choice, [0.0, 0.5, 1.0])
@@ -98,12 +290,24 @@ class SmartHomeScheduler:
         self.toolbox.register("ev_start", random.randint, 0, 23)
 
         # MODIFIED: Create individual: 4 device starts + 24 battery modes + 1 EV start = 29 genes
-        individual_components = tuple(self.toolbox.__getattribute__(f"start_time_{device}") for device in CELs) + \
-                               tuple([self.toolbox.battery_mode] * 24) + \
-                                (self.toolbox.ev_start,)
-        self.toolbox.register("individual", tools.initCycle, creator.Individual, individual_components, n=1)
+        individual_components = (
+            tuple(
+                self.toolbox.__getattribute__(f"start_time_{device}") for device in CELs
+            )
+            + tuple([self.toolbox.battery_mode] * 24)
+            + (self.toolbox.ev_start,)
+        )
+        self.toolbox.register(
+            "individual",
+            tools.initCycle,
+            creator.Individual,
+            individual_components,
+            n=1,
+        )
 
-        self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
+        self.toolbox.register(
+            "population", tools.initRepeat, list, self.toolbox.individual
+        )
         self.toolbox.register("evaluate", self.evaluate_individual)
         self.toolbox.register("mate", self.custom_crossover)
         self.toolbox.register("mutate", self.custom_mutation)
@@ -119,10 +323,15 @@ class SmartHomeScheduler:
         # Repair precedence
         for dependent, prerequisite in Precedence.items():
             prereq_end = device_starts[prerequisite] + Duration[prerequisite]
-            device_starts[dependent] = max(prereq_end, min(device_starts[dependent], Tclf[dependent] - Duration[dependent] + 1))
+            device_starts[dependent] = max(
+                prereq_end,
+                min(
+                    device_starts[dependent], Tclf[dependent] - Duration[dependent] + 1
+                ),
+            )
 
         # Battery modes
-        battery_modes = np.array(individual[len(CELs):len(CELs) + 24])
+        battery_modes = np.array(individual[len(CELs) : len(CELs) + 24])
 
         # EV start time
         ev_start = int(individual[-1])
@@ -168,7 +377,7 @@ class SmartHomeScheduler:
         P_bi = np.zeros(24)  # Battery discharging
         P_grid = np.zeros(24)  # Grid power
         P_sell = np.zeros(24)  # Selling power
-        E_b = np.zeros(24)   # Battery energy
+        E_b = np.zeros(24)  # Battery energy
         Ptevb = self.create_ev_schedule(ev_start)
 
         E_b[0] = E_b_init
@@ -209,12 +418,14 @@ class SmartHomeScheduler:
 
             # Update battery
             if t < 23:
-                E_b[t+1] = E_b[t] + P_br[t] - P_bi[t] - P_sell[t]
-                E_b[t+1] = np.clip(E_b[t+1], 0, E_b_max)
+                E_b[t + 1] = E_b[t] + P_br[t] - P_bi[t] - P_sell[t]
+                E_b[t + 1] = np.clip(E_b[t + 1], 0, E_b_max)
 
         return P_br, P_bi, P_grid, P_sell, E_b, Ptevb
 
-    def check_constraints(self, X, device_starts, P_br, P_bi, P_grid, P_sell, E_b, Ptevb):
+    def check_constraints(
+        self, X, device_starts, P_br, P_bi, P_grid, P_sell, E_b, Ptevb
+    ):
         """Check constraints and return penalty and feasibility"""
         penalty = 0
         feasible = True
@@ -233,7 +444,10 @@ class SmartHomeScheduler:
 
         # Precedence
         for dependent, prerequisite in Precedence.items():
-            if device_starts[dependent] < device_starts[prerequisite] + Duration[prerequisite]:
+            if (
+                device_starts[dependent]
+                < device_starts[prerequisite] + Duration[prerequisite]
+            ):
                 penalty += 500
                 feasible = False
 
@@ -254,11 +468,15 @@ class SmartHomeScheduler:
                 feasible = False
 
             if P_br[t] > P_br_max or P_bi[t] > P_bi_max:
-                penalty += (max(P_br[t] - P_br_max, 0) + max(P_bi[t] - P_bi_max, 0)) * 200
+                penalty += (
+                    max(P_br[t] - P_br_max, 0) + max(P_bi[t] - P_bi_max, 0)
+                ) * 200
                 feasible = False
 
             if P_grid[t] > P_grid_max or P_sell[t] > P_sell_max:
-                penalty += (max(P_grid[t] - P_grid_max, 0) + max(P_sell[t] - P_sell_max, 0)) * 200
+                penalty += (
+                    max(P_grid[t] - P_grid_max, 0) + max(P_sell[t] - P_sell_max, 0)
+                ) * 200
                 feasible = False
 
         # EV constraint
@@ -271,7 +489,13 @@ class SmartHomeScheduler:
         # Energy balance
         for t in range(24):
             supply = P_re[t] + P_grid[t] + P_bi[t]
-            demand = P_br[t] + Ptevb[t] + sum(Pcl[j] * X[j][t] for j in CELs) + Pncl[t] + P_sell[t]
+            demand = (
+                P_br[t]
+                + Ptevb[t]
+                + sum(Pcl[j] * X[j][t] for j in CELs)
+                + Pncl[t]
+                + P_sell[t]
+            )
             balance_error = abs(supply - demand)
             if balance_error > 0.01:
                 penalty += balance_error * 1000
@@ -286,7 +510,9 @@ class SmartHomeScheduler:
         selling_revenue = np.sum(R_sell * P_sell)
         energy_cost = grid_cost + renewable_cost - selling_revenue
 
-        discomfort = sum((device_starts[j] - Tcli[j]) / max(1, Tclf[j] - Tcli[j]) for j in CELs)
+        discomfort = sum(
+            (device_starts[j] - Tcli[j]) / max(1, Tclf[j] - Tcli[j]) for j in CELs
+        )
 
         return energy_cost, discomfort
 
@@ -295,10 +521,16 @@ class SmartHomeScheduler:
         try:
             device_starts, battery_modes, ev_start = self.decode_individual(individual)
             X = self.create_device_schedule(device_starts)
-            P_br, P_bi, P_grid, P_sell, E_b, Ptevb = self.solve_energy_balance(X, battery_modes, ev_start)
+            P_br, P_bi, P_grid, P_sell, E_b, Ptevb = self.solve_energy_balance(
+                X, battery_modes, ev_start
+            )
 
-            penalty, feasible = self.check_constraints(X, device_starts, P_br, P_bi, P_grid, P_sell, E_b, Ptevb)
-            energy_cost, discomfort = self.calculate_objectives(P_grid, P_sell, device_starts)
+            penalty, feasible = self.check_constraints(
+                X, device_starts, P_br, P_bi, P_grid, P_sell, E_b, Ptevb
+            )
+            energy_cost, discomfort = self.calculate_objectives(
+                P_grid, P_sell, device_starts
+            )
 
             return (energy_cost + penalty / 1000, discomfort + penalty / 1000, feasible)
 
@@ -336,7 +568,10 @@ class SmartHomeScheduler:
             prereq_idx = CELs.index(prerequisite)
             dep_idx = CELs.index(dependent)
             prereq_end = individual[prereq_idx] + Duration[prerequisite]
-            individual[dep_idx] = max(prereq_end, min(individual[dep_idx], Tclf[dependent] - Duration[dependent] + 1))
+            individual[dep_idx] = max(
+                prereq_end,
+                min(individual[dep_idx], Tclf[dependent] - Duration[dependent] + 1),
+            )
 
         # Battery modes
         for i in range(len(CELs), len(CELs) + 24):
@@ -347,11 +582,13 @@ class SmartHomeScheduler:
         if random.random() < indpb:
             individual[-1] = random.randint(0, 23)
 
-        return individual,
+        return (individual,)
 
     def run_optimization(self, pop_size=100, generations=50):
         """Run NSGA-II optimization"""
-        print(f"Starting NSGA-II Optimization: pop_size={pop_size}, generations={generations}")
+        print(
+            f"Starting NSGA-II Optimization: pop_size={pop_size}, generations={generations}"
+        )
 
         pop = self.toolbox.population(n=pop_size)
 
@@ -377,8 +614,8 @@ class SmartHomeScheduler:
 
             for i in range(1, len(offspring), 2):
                 if random.random() < 0.7:
-                    self.toolbox.mate(offspring[i-1], offspring[i])
-                    del offspring[i-1].fitness.values
+                    self.toolbox.mate(offspring[i - 1], offspring[i])
+                    del offspring[i - 1].fitness.values
                     del offspring[i].fitness.values
 
             for i in range(len(offspring)):
@@ -386,7 +623,11 @@ class SmartHomeScheduler:
                     self.toolbox.mutate(offspring[i], indpb=indpb)
                     del offspring[i].fitness.values
 
-            invalid_ind = [ind for ind in offspring if not hasattr(ind.fitness, 'values') or not ind.fitness.values]
+            invalid_ind = [
+                ind
+                for ind in offspring
+                if not hasattr(ind.fitness, "values") or not ind.fitness.values
+            ]
             fitnesses = self.toolbox.map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = (fit[0], fit[1])
@@ -399,7 +640,9 @@ class SmartHomeScheduler:
                 avg_cost, avg_discomfort = np.mean(fits, axis=0)
                 min_cost, min_discomfort = np.min(fits, axis=0)
                 print(f"  Avg Cost: {avg_cost:.2f}, Min Cost: {min_cost:.2f}")
-                print(f"  Avg Discomfort: {avg_discomfort:.2f}, Min Discomfort: {min_discomfort:.2f}")
+                print(
+                    f"  Avg Discomfort: {avg_discomfort:.2f}, Min Discomfort: {min_discomfort:.2f}"
+                )
 
         pareto_front = tools.selNSGA2(pop, len(pop))
         pareto_front = [ind for ind in pareto_front if ind.fitness.feasible]
@@ -410,7 +653,9 @@ class SmartHomeScheduler:
         """Analyze solution"""
         device_starts, battery_modes, ev_start = self.decode_individual(individual)
         X = self.create_device_schedule(device_starts)
-        P_br, P_bi, P_grid, P_sell, E_b, Ptevb = self.solve_energy_balance(X, battery_modes, ev_start)
+        P_br, P_bi, P_grid, P_sell, E_b, Ptevb = self.solve_energy_balance(
+            X, battery_modes, ev_start
+        )
 
         print(f"\n--- Solution {solution_num} Analysis ---")
         print("Device Schedule:")
@@ -420,7 +665,9 @@ class SmartHomeScheduler:
             end_time = start_time + duration - 1
             print(f"  {device}: Hours {start_time}-{end_time} (Duration: {duration}h)")
 
-        energy_cost, discomfort = self.calculate_objectives(P_grid, P_sell, device_starts)
+        energy_cost, discomfort = self.calculate_objectives(
+            P_grid, P_sell, device_starts
+        )
         total_ev_energy = np.sum(Ptevb)
         print(f"EV Start Hour: {ev_start}")
         print(f"EV Energy Charged: {total_ev_energy:.2f} kWh")
@@ -430,27 +677,40 @@ class SmartHomeScheduler:
 
         return energy_cost, discomfort
 
+
 def plot_pareto_front(costs, discomforts):
-        """Plot Pareto front with solution labels."""
-        plt.figure(figsize=(10, 8))
-        plt.scatter(costs, discomforts, c='red', s=100, alpha=0.7, edgecolors='black', linewidth=1)
-        
-        # Add solution numbers as labels
-        for i, (cost, discomfort) in enumerate(zip(costs, discomforts), 1):
-            plt.annotate(f'S{i}', (cost, discomfort), xytext=(5, 5), 
-                        textcoords='offset points', fontsize=9, alpha=0.8)
-        
-        plt.xlabel('Energy Cost', fontsize=12)
-        plt.ylabel('User Discomfort', fontsize=12)
-        plt.title('Pareto Front: Energy Cost vs User Discomfort\n(4 Devices: Washing Machine, Dryer, Dishwasher, Oven)', fontsize=14)
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        
-        # Add some styling
-        plt.gca().spines['top'].set_visible(False)
-        plt.gca().spines['right'].set_visible(False)
-        
-        plt.show()
+    """Plot Pareto front with solution labels."""
+    plt.figure(figsize=(10, 8))
+    plt.scatter(
+        costs, discomforts, c="red", s=100, alpha=0.7, edgecolors="black", linewidth=1
+    )
+
+    # Add solution numbers as labels
+    for i, (cost, discomfort) in enumerate(zip(costs, discomforts), 1):
+        plt.annotate(
+            f"S{i}",
+            (cost, discomfort),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=9,
+            alpha=0.8,
+        )
+
+    plt.xlabel("Energy Cost", fontsize=12)
+    plt.ylabel("User Discomfort", fontsize=12)
+    plt.title(
+        "Pareto Front: Energy Cost vs User Discomfort\n(4 Devices: Washing Machine, Dryer, Dishwasher, Oven)",
+        fontsize=14,
+    )
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Add some styling
+    plt.gca().spines["top"].set_visible(False)
+    plt.gca().spines["right"].set_visible(False)
+
+    plt.show()
+
 
 def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
     """Plot distributions for energy cost, discomfort, and appliance start times."""
@@ -458,35 +718,52 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
 
     # Energy cost distribution
     plt.subplot(2, 2, 2)
-    plt.hist(energy_costs, bins=min(10, len(energy_costs)), alpha=0.7, color='blue', edgecolor='black')
-    plt.xlabel('Energy Cost')
-    plt.ylabel('Frequency')
-    plt.title('Energy Cost Distribution')
+    plt.hist(
+        energy_costs,
+        bins=min(10, len(energy_costs)),
+        alpha=0.7,
+        color="blue",
+        edgecolor="black",
+    )
+    plt.xlabel("Energy Cost")
+    plt.ylabel("Frequency")
+    plt.title("Energy Cost Distribution")
     plt.grid(True, alpha=0.3)
 
     # Discomfort distribution
     plt.subplot(2, 2, 3)
-    plt.hist(discomforts, bins=min(10, len(discomforts)), alpha=0.7, color='green', edgecolor='black')
-    plt.xlabel('Discomfort')
-    plt.ylabel('Frequency')
-    plt.title('Discomfort Distribution')
+    plt.hist(
+        discomforts,
+        bins=min(10, len(discomforts)),
+        alpha=0.7,
+        color="green",
+        edgecolor="black",
+    )
+    plt.xlabel("Discomfort")
+    plt.ylabel("Frequency")
+    plt.title("Discomfort Distribution")
     plt.grid(True, alpha=0.3)
 
     # Start times distribution
     plt.subplot(2, 2, 4)
     start_times_data = np.array(solutions)
     for i, device in enumerate(CELs):
-        plt.hist(start_times_data[:, i], bins=range(0, 25), alpha=0.5, 
-                label=device, edgecolor='black')
-    plt.xlabel('Start Time (Hour)')
-    plt.ylabel('Frequency')
-    plt.title('Appliance Start Times Distribution')
+        plt.hist(
+            start_times_data[:, i],
+            bins=range(0, 25),
+            alpha=0.5,
+            label=device,
+            edgecolor="black",
+        )
+    plt.xlabel("Start Time (Hour)")
+    plt.ylabel("Frequency")
+    plt.title("Appliance Start Times Distribution")
     plt.legend()
     plt.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
-    
+
 
 # Main execution
 if __name__ == "__main__":
@@ -495,10 +772,10 @@ if __name__ == "__main__":
 
     # MODIFIED: Print ALL Pareto front solutions
     print(f"\n**All Pareto Front Solutions ({len(pareto_front)} solutions):**\n")
-    
+
     costs = []
     discomforts = []
-    
+
     for i, ind in enumerate(pareto_front, 1):
         energy_cost, discomfort = scheduler.analyze_solution(ind, i)
         costs.append(energy_cost)
@@ -507,55 +784,79 @@ if __name__ == "__main__":
 
     # Call plot functions
     plot_pareto_front(costs, discomforts)
-    #plot_solution_distributions(costs, discomforts, pareto_front, CELs)
-    
+    # plot_solution_distributions(costs, discomforts, pareto_front, CELs)
+
     # Create summary DataFrame
-    summary_df = pd.DataFrame({
-        'Solution': [f'S{i}' for i in range(1, len(pareto_front) + 1)],
-        'Energy_Cost': costs,
-        'User_Discomfort': discomforts
-    })
-    
+    summary_df = pd.DataFrame(
+        {
+            "Solution": [f"S{i}" for i in range(1, len(pareto_front) + 1)],
+            "Energy_Cost": costs,
+            "User_Discomfort": discomforts,
+        }
+    )
+
     print(f"\n**Pareto Front Summary:**")
     print(summary_df.to_string(index=False))
-    
+
     # Save summary to CSV
     # summary_df.to_csv('pareto_front_solutions.csv', index=False)
     # print(f"\nPareto front solutions saved to 'pareto_front_solutions.csv'")
-    
+
     # Get the best solution (lowest energy cost) for detailed analysis
     best_idx = costs.index(min(costs))
     best_ind = pareto_front[best_idx]
-    
+
     device_starts, battery_modes, ev_start = scheduler.decode_individual(best_ind)
     X = scheduler.create_device_schedule(device_starts)
-    P_br, P_bi, P_grid, P_sell, E_b, Ptevb = scheduler.solve_energy_balance(X, battery_modes, ev_start)
+    P_br, P_bi, P_grid, P_sell, E_b, Ptevb = scheduler.solve_energy_balance(
+        X, battery_modes, ev_start
+    )
 
     # Create detailed analysis DataFrame for best solution
     analysis_data = {
-        'Hour': range(24),
-        'Psun': P_sun,
-        'Pwind': P_wind,
-        'C_re': C_re,
-        'P_grid': P_grid,
-        'C_grid': C_grid,
-        'P_sell': P_sell,
-        'R_sell': R_sell,
-        'P_bi': P_bi,
-        'P_br': P_br,
-        'E_battery': E_b,
-        'Ptevb': Ptevb,
-        'Pncl': Pncl
+        "Hour": range(24),
+        "Psun": P_sun,
+        "Pwind": P_wind,
+        "C_re": C_re,
+        "P_grid": P_grid,
+        "C_grid": C_grid,
+        "P_sell": P_sell,
+        "R_sell": R_sell,
+        "P_bi": P_bi,
+        "P_br": P_br,
+        "E_battery": E_b,
+        "Ptevb": Ptevb,
+        "Pncl": Pncl,
     }
-    
+
     # Add total device consumption (P_cl) for each hour
-    analysis_data['P_cl'] = [sum(Pcl[device] * X[device][t] for device in CELs) for t in range(24)]
-    
-    # Add devices running at each hour
-    analysis_data['Devices_On'] = [
-        ', '.join([device for device in CELs if X[device][t] == 1]) for t in range(24)
+    analysis_data["P_cl"] = [
+        sum(Pcl[device] * X[device][t] for device in CELs) for t in range(24)
     ]
-    
+
+    # Add devices running at each hour
+    analysis_data["Devices_On"] = [
+        ", ".join([device for device in CELs if X[device][t] == 1]) for t in range(24)
+    ]
+
     analysis_df = pd.DataFrame(analysis_data)
     # analysis_df.to_csv('best_solution_detailed_analysis.csv', index=False)
     # print(f"Best solution detailed analysis saved to 'best_solution_detailed_analysis.csv'")
+
+    # Sample Time-Series Table
+    sample_data = pd.DataFrame(
+        {
+            "Hour": list(range(24)),
+            "P_sun": P_sun[:],
+            "P_wind": P_wind[:],
+            "Pncl": Pncl[:],
+            "Grid Cost (C_grid)": C_grid[:],
+            "Sell Revenue (R_sell)": R_sell[:],
+        }
+    )
+
+    # Round to 2 decimal places
+    sample_data = sample_data.round(2)
+
+    print("\n=== Sample Inputs ===")
+    print(sample_data.to_string(index=False))

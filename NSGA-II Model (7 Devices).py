@@ -17,17 +17,209 @@ T_i = 0
 T_f = 23
 
 # Renewable Energy Generation and Costs
-P_sun = np.array([0.0, 0.0, 0.0,0.0,0.0,0.0,0.1,0.2,0.3,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.3,0.2,0.1,0.0,0.0,0.0,0.0,0.0])  # 24 hours
-P_wind = np.array([0.3, 0.3, 0.3,0.3,0.3,0.3,0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.2,0.3,0.3,0.3,0.3,0.3,0.3])  # 24 hours
-P_re = P_sun + P_wind
-C_re = np.array([0.15, 0.20] * 12)  # 24 hours
+P_sun_base = np.array(
+    [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.4,
+        0.3,
+        0.2,
+        0.1,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+)
+P_wind_base = np.array(
+    [
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.2,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.2,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+    ]
+)
 
+C_re_base = np.array(
+    [
+        0.18,
+        0.18,
+        0.18,
+        0.18,
+        0.17,
+        0.17,  # Early morning (midnight to 6 AM) - wind only, slightly higher
+        0.10,
+        0.08,
+        0.07,
+        0.06,
+        0.06,
+        0.06,  # Morning sunlight (6 AM – noon) - high solar, lower cost
+        0.06,
+        0.06,
+        0.07,
+        0.08,
+        0.10,
+        0.12,  # Afternoon – solar declines
+        0.14,
+        0.16,
+        0.17,
+        0.18,
+        0.18,
+        0.18,  # Evening – mostly wind again, cost increases slightly
+    ]
+)
 # Grid Cost and Selling Price
-C_grid = np.array([0.25, 0.20, 0.18, 0.15, 0.12, 0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.07, 0.10, 0.13, 0.16, 0.18, 0.20, 0.22, 0.25, 0.23, 0.21, 0.19, 0.17])
-R_sell = np.array([0.20, 0.15, 0.25, 0.05, 0.20, 0.06, 0.08, 0.10, 0.20, 0.10, 0.08, 0.20, 0.15, 0.12, 0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.18, 0.16, 0.14, 0.12])
-
+C_grid_base = np.array(
+    [
+        0.25,
+        0.20,
+        0.18,
+        0.15,
+        0.12,
+        0.10,
+        0.09,
+        0.08,
+        0.07,
+        0.06,
+        0.05,
+        0.04,
+        0.07,
+        0.10,
+        0.13,
+        0.16,
+        0.18,
+        0.20,
+        0.22,
+        0.25,
+        0.23,
+        0.21,
+        0.19,
+        0.17,
+    ]
+)
+R_sell_base = np.array(
+    [
+        0.20,
+        0.15,
+        0.25,
+        0.05,
+        0.20,
+        0.06,
+        0.08,
+        0.10,
+        0.20,
+        0.10,
+        0.08,
+        0.20,
+        0.15,
+        0.12,
+        0.10,
+        0.12,
+        0.14,
+        0.16,
+        0.18,
+        0.20,
+        0.18,
+        0.16,
+        0.14,
+        0.12,
+    ]
+)
 # Non-controllable Load
-Pncl = np.array([1.5, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2, 0.1, 0.5, 0.8, 1.0, 1.3, 1.5, 1.7, 1.6, 1.4, 1.2, 1.0])
+Pncl_base = np.array(
+    [
+        1.5,
+        1.2,
+        1.0,
+        0.9,
+        0.8,
+        0.7,
+        0.6,
+        0.5,
+        0.4,
+        0.3,
+        0.2,
+        0.1,
+        0.2,
+        0.1,
+        0.5,
+        0.8,
+        1.0,
+        1.3,
+        1.5,
+        1.7,
+        1.6,
+        1.4,
+        1.2,
+        1.0,
+    ]
+)
+
+# Stochastic Mode
+USE_STOCHASTIC_INPUTS = False  # Set to False to use original fixed values
+
+
+if USE_STOCHASTIC_INPUTS:
+    np.random.seed()  # Optional: remove seed for full randomness
+
+    # Add Gaussian noise (mean=0, std=0.03) and clip to non-negative
+    P_sun = np.clip(P_sun_base + np.random.normal(0, 0.03, size=24), 0, 1)
+    P_wind = np.clip(P_wind_base + np.random.normal(0, 0.03, size=24), 0, 1)
+
+    # For costs, allow ±10% fluctuation
+    C_grid = np.clip(
+        C_grid_base * (1 + np.random.uniform(-0.1, 0.1, size=24)), 0.01, 1.0
+    )
+    R_sell = np.clip(
+        R_sell_base * (1 + np.random.uniform(-0.1, 0.1, size=24)), 0.01, 1.0
+    )
+    # Add randomness to non-controllable load: ±10% noise
+    Pncl = np.clip(Pncl_base * (1 + np.random.normal(0, 0.1, size=24)), 0.1, None)
+
+    C_re = np.clip(C_re_base * (1 + np.random.uniform(-0.1, 0.1, size=24)), 0.01, 1.0)
+else:
+    P_sun = P_sun_base
+    P_wind = P_wind_base
+    C_grid = C_grid_base
+    R_sell = R_sell_base
+    Pncl = Pncl_base
+    C_re = C_re_base
+
+P_re = P_sun + P_wind
 
 # Device parameters
 Tcli = {
@@ -108,8 +300,8 @@ class SmartHomeScheduler:
 
         # MODIFIED: Create individual: 4 device starts + 24 battery modes + 1 EV start = 29 genes
         individual_components = tuple(self.toolbox.__getattribute__(f"start_time_{device}") for device in CELs) + \
-                               tuple([self.toolbox.battery_mode] * 24) + \
-                               (self.toolbox.ev_start,)
+                                tuple([self.toolbox.battery_mode] * 24) + \
+                                (self.toolbox.ev_start,)
         self.toolbox.register("individual", tools.initCycle, creator.Individual, individual_components, n=1)
 
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
@@ -486,7 +678,7 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
     start_times_data = np.array(solutions)
     for i, device in enumerate(CELs):
         plt.hist(start_times_data[:, i], bins=range(0, 25), alpha=0.5, 
-                 label=device, edgecolor='black')
+                label=device, edgecolor='black')
     plt.xlabel('Start Time (Hour)')
     plt.ylabel('Frequency')
     plt.title('Appliance Start Times Distribution')
@@ -495,7 +687,7 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
 
     plt.tight_layout()
     plt.show()
-    
+
 
 # Main execution
 if __name__ == "__main__":
@@ -504,10 +696,10 @@ if __name__ == "__main__":
 
     # MODIFIED: Print ALL Pareto front solutions
     print(f"\n**All Pareto Front Solutions ({len(pareto_front)} solutions):**\n")
-    
+
     costs = []
     discomforts = []
-    
+
     for i, ind in enumerate(pareto_front, 1):
         energy_cost, discomfort = scheduler.analyze_solution(ind, i)
         costs.append(energy_cost)
@@ -516,26 +708,26 @@ if __name__ == "__main__":
 
     # Call plot functions
     plot_pareto_front(costs, discomforts)
-    #plot_solution_distributions(costs, discomforts, pareto_front, CELs)
-    
+    # plot_solution_distributions(costs, discomforts, pareto_front, CELs)
+
     # Create summary DataFrame
     summary_df = pd.DataFrame({
         'Solution': [f'S{i}' for i in range(1, len(pareto_front) + 1)],
         'Energy_Cost': costs,
         'User_Discomfort': discomforts
     })
-    
+
     print(f"\n**Pareto Front Summary:**")
     print(summary_df.to_string(index=False))
-    
+
     # Save summary to CSV
     # summary_df.to_csv('pareto_front_solutions.csv', index=False)
     # print(f"\nPareto front solutions saved to 'pareto_front_solutions.csv'")
-    
+
     # Get the best solution (lowest energy cost) for detailed analysis
     best_idx = costs.index(min(costs))
     best_ind = pareto_front[best_idx]
-    
+
     device_starts, battery_modes, ev_start = scheduler.decode_individual(best_ind)
     X = scheduler.create_device_schedule(device_starts)
     P_br, P_bi, P_grid, P_sell, E_b, Ptevb = scheduler.solve_energy_balance(X, battery_modes, ev_start)
@@ -556,15 +748,33 @@ if __name__ == "__main__":
         'Ptevb': Ptevb,
         'Pncl': Pncl
     }
-    
+
     # Add total device consumption (P_cl) for each hour
     analysis_data['P_cl'] = [sum(Pcl[device] * X[device][t] for device in CELs) for t in range(24)]
-    
+
     # Add devices running at each hour
     analysis_data['Devices_On'] = [
         ', '.join([device for device in CELs if X[device][t] == 1]) for t in range(24)
     ]
-    
+
     analysis_df = pd.DataFrame(analysis_data)
     # analysis_df.to_csv('best_solution_detailed_analysis.csv', index=False)
     # print(f"Best solution detailed analysis saved to 'best_solution_detailed_analysis.csv'")
+
+    # Sample Time-Series Table
+    sample_data = pd.DataFrame(
+        {
+            "Hour": list(range(24)),
+            "P_sun": P_sun[:],
+            "P_wind": P_wind[:],
+            "Pncl": Pncl[:],
+            "(C_grid)": C_grid[:],
+            "(R_sell)": R_sell[:],
+        }
+    )
+
+    # Round to 2 decimal places
+    sample_data = sample_data.round(2)
+
+    print("\n=== Sample Inputs ===")
+    print(sample_data.to_string(index=False))
