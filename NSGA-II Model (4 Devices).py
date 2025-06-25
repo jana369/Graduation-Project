@@ -768,7 +768,7 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
 # Main execution
 if __name__ == "__main__":
     scheduler = SmartHomeScheduler()
-    pareto_front = scheduler.run_optimization(pop_size=100, generations=200)
+    pareto_front = scheduler.run_optimization(pop_size=150, generations=300)
 
     # MODIFIED: Print ALL Pareto front solutions
     print(f"\n**All Pareto Front Solutions ({len(pareto_front)} solutions):**\n")

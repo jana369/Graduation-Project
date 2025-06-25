@@ -311,8 +311,8 @@ class SmartHomeScheduler:
 
         # MODIFIED: Create individual: 4 device starts + 24 battery modes + 1 EV start = 29 genes
         individual_components = tuple(self.toolbox.__getattribute__(f"start_time_{device}") for device in CELs) + \
-                               tuple([self.toolbox.battery_mode] * 24) + \
-                               (self.toolbox.ev_start,)
+                                tuple([self.toolbox.battery_mode] * 24) + \
+                                (self.toolbox.ev_start,)
         self.toolbox.register("individual", tools.initCycle, creator.Individual, individual_components, n=1)
 
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
@@ -703,7 +703,7 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
 # Main execution
 if __name__ == "__main__":
     scheduler = SmartHomeScheduler()
-    pareto_front = scheduler.run_optimization(pop_size=100, generations=200)
+    pareto_front = scheduler.run_optimization(pop_size=400, generations=500)
 
     # MODIFIED: Print ALL Pareto front solutions
     print(f"\n**All Pareto Front Solutions ({len(pareto_front)} solutions):**\n")
