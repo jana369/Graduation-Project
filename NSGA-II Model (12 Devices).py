@@ -9,12 +9,55 @@ warnings.filterwarnings('ignore')
 
 # Problem Parameters
 T = range(24)  # 24-hour scheduling period
+T_i = 0
+T_f = 23
 
+# Device parameters
 CELs = ["Washing Machine", "Dryer", "Dishwasher", "Oven", "Rice Cooker", "Kettle", "Water Heater", "AC",
         "Heater", "Smart fan", "Vacuum Cleaner", "Pool Pump"]
 
-T_i = 0
-T_f = 23
+Tcli = {
+    "Washing Machine": 18, "Dryer": 18,
+    "Dishwasher": 15, "Oven": 12,
+    "Rice Cooker": 12, "Kettle": 12,
+    "Water Heater": 6, "AC": 12,
+    "Heater": 3, "Smart fan": 12,
+    "Vacuum Cleaner": 3, "Pool Pump": 10
+    }
+
+Tclf = {
+    "Washing Machine": 23, "Dryer": 23,
+    "Dishwasher": 20, "Oven": 16,
+    "Rice Cooker": 16, "Kettle": 23,
+    "Water Heater": 14, "AC": 20,
+    "Heater": 8, "Smart fan": 18,
+    "Vacuum Cleaner": 21, "Pool Pump": 19
+    }
+
+Duration = {
+    "Washing Machine": 2, "Dryer": 1,
+    "Dishwasher": 1, "Oven": 2,
+    "Rice Cooker": 1, "Kettle": 1,
+    "Water Heater": 2, "AC": 5,
+    "Heater": 2, "Smart fan": 3,
+    "Vacuum Cleaner": 1, "Pool Pump": 4
+    }
+
+Pcl = {
+    "Washing Machine": 2.0, "Dryer": 0.8,
+    "Dishwasher": 1.0, "Oven": 1.5,
+    "Rice Cooker": 0.8, "Kettle": 0.3,
+    "Water Heater": 1.7, "AC": 4.0,
+    "Heater": 1.8, "Smart fan": 0.4,
+    "Vacuum Cleaner": 0.9, "Pool Pump": 3.2
+    }
+
+Precedence = {
+    "Dryer": "Washing Machine",
+    "Dishwasher": "Oven",
+    "Oven": "Rice Cooker",
+    "Kettle": "Rice Cooker",
+    }
 
 # Renewable Energy Generation and Costs
 P_sun_base = np.array(
@@ -221,51 +264,6 @@ else:
     C_re = C_re_base
 
 P_re = P_sun + P_wind
-
-# Device parameters
-Tcli = {
-    "Washing Machine": 18, "Dryer": 18,
-    "Dishwasher": 15, "Oven": 12,
-    "Rice Cooker": 12, "Kettle": 12,
-    "Water Heater": 6, "AC": 12,
-    "Heater": 3, "Smart fan": 12,
-    "Vacuum Cleaner": 3, "Pool Pump": 10
-    }
-
-Tclf = {
-    "Washing Machine": 23, "Dryer": 23,
-    "Dishwasher": 20, "Oven": 16,
-    "Rice Cooker": 16, "Kettle": 23,
-    "Water Heater": 14, "AC": 20,
-    "Heater": 8, "Smart fan": 18,
-    "Vacuum Cleaner": 21, "Pool Pump": 19
-    }
-
-Duration = {
-    "Washing Machine": 2, "Dryer": 1,
-    "Dishwasher": 1, "Oven": 2,
-    "Rice Cooker": 1, "Kettle": 1,
-    "Water Heater": 2, "AC": 5,
-    "Heater": 2, "Smart fan": 3,
-    "Vacuum Cleaner": 1, "Pool Pump": 4
-    }
-
-Pcl = {
-    "Washing Machine": 2.0, "Dryer": 0.8,
-    "Dishwasher": 1.0, "Oven": 1.5,
-    "Rice Cooker": 0.8, "Kettle": 0.3,
-    "Water Heater": 1.7, "AC": 4.0,
-    "Heater": 1.8, "Smart fan": 0.4,
-    "Vacuum Cleaner": 0.9, "Pool Pump": 3.2
-    }
-
-Precedence = {
-    "Dryer": "Washing Machine",
-    "Dishwasher": "Oven",
-    "Oven": "Rice Cooker",
-    "Kettle": "Rice Cooker",
-    }
-
 
 # System Constants
 lambdaa = 2  # MODIFIED: Max CELs connected simultaneously (reduced from 5 to 4)
@@ -642,28 +640,6 @@ class SmartHomeScheduler:
 
         return energy_cost, discomfort
 
-def plot_pareto_front(costs, discomforts):
-        """Plot Pareto front with solution labels."""
-        plt.figure(figsize=(10, 8))
-        plt.scatter(costs, discomforts, c='red', s=100, alpha=0.7, edgecolors='black', linewidth=1)
-        
-        # Add solution numbers as labels
-        for i, (cost, discomfort) in enumerate(zip(costs, discomforts), 1):
-            plt.annotate(f'S{i}', (cost, discomfort), xytext=(5, 5), 
-                        textcoords='offset points', fontsize=9, alpha=0.8)
-        
-        plt.xlabel('Energy Cost', fontsize=12)
-        plt.ylabel('User Discomfort', fontsize=12)
-        plt.title('Pareto Front: Energy Cost vs User Discomfort\n(12 Devices)', fontsize=14)
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        
-        # Add some styling
-        plt.gca().spines['top'].set_visible(False)
-        plt.gca().spines['right'].set_visible(False)
-        
-        plt.show()
-
 def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
     """Plot distributions for energy cost, discomfort, and appliance start times."""
     plt.figure(figsize=(16, 10))
@@ -700,92 +676,159 @@ def plot_solution_distributions(energy_costs, discomforts, solutions, CELs):
     plt.show()
 
 
-# Main execution
-if __name__ == "__main__":
-    scheduler = SmartHomeScheduler()
-    pareto_front = scheduler.run_optimization(pop_size=400, generations=500)
+#Function to check dominance of solutions in pareto front
+def check_dominance(pareto_front):
+    count_dominates = 0
+    for i in range(len(pareto_front)):
+        for j in range(i + 1, len(pareto_front)):
+            if (
+                pareto_front[i].fitness.values[0] < pareto_front[j].fitness.values[0]
+                and pareto_front[i].fitness.values[1] < pareto_front[j].fitness.values[1]
+            ):
+                count_dominates += 1
+                #print(f"Solution {i} dominates Solution {j}")
+            elif (
+                pareto_front[i].fitness.values[0] > pareto_front[j].fitness.values[0]
+                and pareto_front[i].fitness.values[1] > pareto_front[j].fitness.values[1]
+            ):
+                count_dominates += 1
+                #print(f"Solution {j} dominates Solution {i}")
+            elif (
+                pareto_front[i].fitness.values[0] == pareto_front[j].fitness.values[0]
+                and pareto_front[i].fitness.values[1] == pareto_front[j].fitness.values[1]
+            ):  pass
+                #print(f"Solution {i} and Solution {j} are equal")
+            else:
+                pass
+                #print(f"Solution {i} and Solution {j} are non-dominated with respect to each other")
+    print(f"Solutions that dominate others: {count_dominates}")
 
-    # MODIFIED: Print ALL Pareto front solutions
-    print(f"\n**All Pareto Front Solutions ({len(pareto_front)} solutions):**\n")
+#function to remove duplicate solutions from pareto front and return unique solutions as a new pareto front
+def remove_duplicate_solutions(pareto_front):
+    seen = set()
+    unique_solutions = []
+    for solution in pareto_front:
+        solution_tuple = tuple(solution)
+        if solution_tuple not in seen:
+            seen.add(solution_tuple)
+            unique_solutions.append(solution)
+    return unique_solutions
 
-    costs = []
-    discomforts = []
-
-    for i, ind in enumerate(pareto_front, 1):
-        energy_cost, discomfort = scheduler.analyze_solution(ind, i)
-        costs.append(energy_cost)
-        discomforts.append(discomfort)
-        print("-" * 50)
-
-    # Call plot functions
-    plot_pareto_front(costs, discomforts)
-    # plot_solution_distributions(costs, discomforts, pareto_front, CELs)
-
-    # Create summary DataFrame
-    summary_df = pd.DataFrame({
-        'Solution': [f'S{i}' for i in range(1, len(pareto_front) + 1)],
-        'Energy_Cost': costs,
-        'User_Discomfort': discomforts
-    })
-
-    print(f"\n**Pareto Front Summary:**")
-    print(summary_df.to_string(index=False))
-
-    # Save summary to CSV
-    # summary_df.to_csv('pareto_front_solutions.csv', index=False)
-    # print(f"\nPareto front solutions saved to 'pareto_front_solutions.csv'")
-
-    # Get the best solution (lowest energy cost) for detailed analysis
-    best_idx = costs.index(min(costs))
-    best_ind = pareto_front[best_idx]
-
-    device_starts, battery_modes, ev_start = scheduler.decode_individual(best_ind)
-    X = scheduler.create_device_schedule(device_starts)
-    P_br, P_bi, P_grid, P_sell, E_b, Ptevb = scheduler.solve_energy_balance(X, battery_modes, ev_start)
-
-    # Create detailed analysis DataFrame for best solution
-    analysis_data = {
-        'Hour': range(24),
-        'Psun': P_sun,
-        'Pwind': P_wind,
-        'C_re': C_re,
-        'P_grid': P_grid,
-        'C_grid': C_grid,
-        'P_sell': P_sell,
-        'R_sell': R_sell,
-        'P_bi': P_bi,
-        'P_br': P_br,
-        'E_battery': E_b,
-        'Ptevb': Ptevb,
-        'Pncl': Pncl
-    }
-
-    # Add total device consumption (P_cl) for each hour
-    analysis_data['P_cl'] = [sum(Pcl[device] * X[device][t] for device in CELs) for t in range(24)]
-
-    # Add devices running at each hour
-    analysis_data['Devices_On'] = [
-        ', '.join([device for device in CELs if X[device][t] == 1]) for t in range(24)
-    ]
-
-    analysis_df = pd.DataFrame(analysis_data)
-    # analysis_df.to_csv('best_solution_detailed_analysis.csv', index=False)
-    # print(f"Best solution detailed analysis saved to 'best_solution_detailed_analysis.csv'")
+# Define remove_duplicates_across_pareto_fronts function 
+def remove_duplicates_across_pareto_fronts(all_pareto_fronts):
+    """Remove duplicate solutions from each Pareto front by comparing across all other Pareto fronts."""
+    if not all_pareto_fronts:
+        return []
     
-    # Sample Time-Series Table
-    sample_data = pd.DataFrame(
-        {
-            "Hour": list(range(24)),
-            "P_sun": P_sun[:],
-            "P_wind": P_wind[:],
-            "Pncl": Pncl[:],
-            "(C_grid)": C_grid[:],
-            "(R_sell)": R_sell[:],
-        }
-    )
+    all_solutions = [ind for pf in all_pareto_fronts for ind in pf]
+    all_solution_tuples = {tuple(ind): ind for ind in all_solutions}
+    
+    unique_pareto_fronts = []
+    for i, pf in enumerate(all_pareto_fronts):
+        unique_pf = []
+        seen_in_other_fronts = set()
+        for j, other_pf in enumerate(all_pareto_fronts):
+            if i != j:
+                seen_in_other_fronts.update(tuple(ind) for ind in other_pf)
+        
+        for ind in pf:
+            ind_tuple = tuple(ind)
+            if ind_tuple not in seen_in_other_fronts:
+                unique_pf.append(ind)
+        
+        if unique_pf:
+            unique_pareto_fronts.append(unique_pf)
+    
+    return unique_pareto_fronts
 
-    # Round to 2 decimal places
-    sample_data = sample_data.round(2)
+# Define remove_dominated_solutions_across_all_pareto_fronts function 
+def remove_dominated_solutions_across_all_pareto_fronts(all_pareto_fronts):
+    """Remove dominated solutions across all Pareto fronts, returning the global non-dominated set."""
+    if not all_pareto_fronts:
+        return []
+    
+    all_solutions = [ind for pf in all_pareto_fronts for ind in pf]
+    
+    non_dominated_solutions = []
+    for ind in all_solutions:
+        is_dominated = False
+        for other in all_solutions:
+            if other != ind:
+                if (other.fitness.values[0] <= ind.fitness.values[0] and 
+                    other.fitness.values[1] <= ind.fitness.values[1] and 
+                    (other.fitness.values[0] < ind.fitness.values[0] or 
+                     other.fitness.values[1] < ind.fitness.values[1])):
+                    is_dominated = True
+                    break
+        if not is_dominated:
+            non_dominated_solutions.append(ind)
+    
+    return non_dominated_solutions
 
-    print("\n=== Sample Inputs ===")
-    print(sample_data.to_string(index=False))
+# Define plot_pareto_front function
+def plot_pareto_front(non_dominated_solutions):
+    """Plot the Pareto front for non-dominated solutions."""
+    costs = [ind.fitness.values[0] for ind in non_dominated_solutions]
+    discomforts = [ind.fitness.values[1] for ind in non_dominated_solutions]
+    plt.figure(figsize=(10, 8))
+    plt.scatter(costs, discomforts, c='red', s=100, alpha=0.7, edgecolors='black', linewidth=1)
+    for i, (cost, discomfort) in enumerate(zip(costs, discomforts), 1):
+        plt.annotate(f'S{i}', (cost, discomfort), xytext=(5, 5), textcoords='offset points', fontsize=9, alpha=0.8)
+    plt.xlabel('Energy Cost', fontsize=12)
+    plt.ylabel('User Discomfort', fontsize=12)
+    plt.title('Pareto Front: Energy Cost vs User Discomfort\n(4 Devices)', fontsize=14)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.show()
+    
+# Function to print non-dominated solutions
+def print_non_dominated_solutions(non_dominated_solutions):
+        costs = [ind.fitness.values[0] for ind in non_dominated_solutions]
+        discomforts = [ind.fitness.values[1] for ind in non_dominated_solutions]
+        print("\n**Non-Dominated Solutions Costs and Discomforts:**")
+        for i, (cost, discomfort) in enumerate(zip(costs, discomforts), 1):
+            print(f"Solution {i}: Cost = {cost:.2f}, Discomfort = {discomfort:.2f}")
+
+
+# New Main Execution
+if __name__ == "__main__":
+    all_pareto_fronts = []
+    num_runs = 30
+
+    for run in range(num_runs):
+        print(f"\n=== Run {run+1}/{num_runs} ===")
+        scheduler = SmartHomeScheduler()
+        pareto_front = scheduler.run_optimization(pop_size=200, generations=300)
+        removed = remove_duplicate_solutions(pareto_front)  # Remove duplicates within each run
+        all_pareto_fronts.append(removed)
+        
+    print(f"\n=== Completed {num_runs} Runs ===")
+    print(f"Size of all Pareto fronts: {len(all_pareto_fronts)}")
+    
+    # Print number of unique solutions in each Pareto front (before cross-front deduplication)
+    unique_solutions_counts = [len(remove_duplicate_solutions(pf)) for pf in all_pareto_fronts]
+    print(f"\n**Number of Unique Solutions in Each Pareto Front (intra-run):** {unique_solutions_counts}")
+    
+    # Remove duplicates across all Pareto fronts
+    unique_pareto_fronts = remove_duplicates_across_pareto_fronts(all_pareto_fronts)
+    total_unique_solutions = sum(len(pf) for pf in unique_pareto_fronts)
+    print(f"\n**Number of Unique Pareto Fronts (after cross-run deduplication):** {len(unique_pareto_fronts)}")
+    print(f"**Total Unique Solutions Across All Pareto Fronts:** {total_unique_solutions}")
+    
+    # Remove dominated solutions across all unique solutions
+    non_dominated_solutions = remove_dominated_solutions_across_all_pareto_fronts(unique_pareto_fronts)
+    
+    print(f"\n**Number of Non-Dominated Solutions Across All Runs:** {len(non_dominated_solutions)}")
+    
+    # Plot the non-dominated solutions
+    plot_pareto_front(non_dominated_solutions)
+    
+    # Call the function after plotting
+    print_non_dominated_solutions(non_dominated_solutions)
+    
+    #print schedule analysis for the first 5 non-dominated solutions
+    for i, solution in enumerate(non_dominated_solutions[:5], 1):
+        energy_cost, discomfort = scheduler.analyze_solution(solution, i)
+        print(f"Solution {i}: Energy Cost = {energy_cost:.2f}, Discomfort = {discomfort:.2f}")
