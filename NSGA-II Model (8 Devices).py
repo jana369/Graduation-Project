@@ -643,7 +643,7 @@ def plot_pareto_front(costs, discomforts):
         
         plt.xlabel('Energy Cost', fontsize=12)
         plt.ylabel('User Discomfort', fontsize=12)
-        plt.title('Pareto Front: Energy Cost vs User Discomfort\n(7 Devices)', fontsize=14)
+        plt.title('Pareto Front: Energy Cost vs User Discomfort\n(8 Devices)', fontsize=14)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         
