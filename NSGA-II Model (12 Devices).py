@@ -571,10 +571,6 @@ class SmartHomeScheduler:
             ind.fitness.values = (fit[0], fit[1])
             ind.fitness.feasible = fit[2]
 
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean, axis=0)
-        stats.register("min", np.min, axis=0)
-
         print("Starting evolution...")
 
         for gen in range(generations):
@@ -603,13 +599,6 @@ class SmartHomeScheduler:
                 ind.fitness.feasible = fit[2]
 
             pop = self.toolbox.select(pop + offspring, pop_size)
-
-            fits = [ind.fitness.values for ind in pop]
-            if fits:
-                avg_cost, avg_discomfort = np.mean(fits, axis=0)
-                min_cost, min_discomfort = np.min(fits, axis=0)
-                print(f"  Avg Cost: {avg_cost:.2f}, Min Cost: {min_cost:.2f}")
-                print(f"  Avg Discomfort: {avg_discomfort:.2f}, Min Discomfort: {min_discomfort:.2f}")
 
         pareto_front = tools.selNSGA2(pop, len(pop))
         pareto_front = [ind for ind in pareto_front if ind.fitness.feasible]
