@@ -454,6 +454,26 @@ def print_non_dominated_solutions(non_dominated_solutions: List[List[float]]):
     for i, (cost, discomfort) in enumerate(zip(costs, discomforts), 1):
         print(f"Solution {i}: Cost = {cost:.2f}, Discomfort = {discomfort:.2f}")
 
+#function to plot a schedule of devices over 24 hours
+def plot_gantt_chart(device_starts: Dict[str, int], devices: List[Device], solution_num: int, scenario_name: str):
+    """Plot a Gantt chart showing the schedule of each device over a 24-hour period."""
+    fig, ax = plt.subplots(figsize=(12, len(devices) * 0.5 + 2))
+    colors = plt.cm.tab20(np.linspace(0, 1, len(devices)))
+    
+    for i, device in enumerate(devices):
+        start = device_starts[device.name]
+        duration = device.duration
+        ax.barh(device.name, duration, left=start, height=0.4, color=colors[i], edgecolor='black')
+    
+    ax.set_xlim(0, 24)
+    ax.set_xticks(range(0, 25, 2))
+    ax.set_xlabel('Hour of Day', fontsize=12)
+    ax.set_ylabel('Devices', fontsize=12)
+    ax.set_title(f'Gantt Chart: Device Schedule for Solution {solution_num} ({scenario_name})', fontsize=14)
+    ax.grid(True, axis='x', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
     # Define scenarios
     scenarios = {
@@ -482,24 +502,50 @@ if __name__ == "__main__":
     for run in range(num_runs):
         print(f"\n=== Run {run+1}/{num_runs} ===")
         scheduler = SmartHomeScheduler(scenario, energy_system, battery, ev)
-        pareto_front = scheduler.run_optimization(pop_size=200, generations=200)
-        num_solutions[run] = len(pareto_front)
+        pareto_front = scheduler.run_optimization(pop_size=200, generations=500)
         removed = remove_duplicate_solutions(pareto_front)
+        num_solutions[run] = len(removed)
         all_pareto_fronts.append(removed)
     
+    # Print summary of all runs
     print(f"\n=== Completed {num_runs} Runs for {SCENARIO} ===")
     print(f"Size of all Pareto fronts: {len(all_pareto_fronts)}")
-    unique_solutions_counts = [len(remove_duplicate_solutions(pf)) for pf in all_pareto_fronts]
-    print(f"\n**Number of Unique Solutions in Each Pareto Front (intra-run):** {unique_solutions_counts}")
+    
+    # Print number of unique solutions for each run
+    for run, size in num_solutions.items():
+        print(f"Run {run+1}: {size} unique solutions")
+        
+    # Remove duplicates across all Pareto fronts and analyze results
     unique_pareto_fronts = remove_duplicates_across_pareto_fronts(all_pareto_fronts)
     total_unique_solutions = sum(len(pf) for pf in unique_pareto_fronts)
     print(f"\n**Number of Unique Pareto Fronts (after cross-run deduplication):** {len(unique_pareto_fronts)}")
     print(f"**Total Unique Solutions Across All Pareto Fronts:** {total_unique_solutions}")
+    
+    # Remove dominated solutions across all Pareto fronts
     non_dominated_solutions = remove_dominated_solutions_across_all_pareto_fronts(unique_pareto_fronts)
     print(f"\n**Number of Non-Dominated Solutions Across All Runs:** {len(non_dominated_solutions)}")
+    
+    # Plot Pareto front and print non-dominated solutions
     plot_pareto_front(non_dominated_solutions, SCENARIO)
+    
+    # Print non-dominated solutions
+    print("\n**Non-Dominated Solutions:**")
     print_non_dominated_solutions(non_dominated_solutions)
     
+    # Analyze and print details of the first 5 non-dominated solutions
+    print("\n**Analyzing First 5 Non-Dominated Solutions:**")
     for i, solution in enumerate(non_dominated_solutions[:5], 1):
         energy_cost, discomfort = scheduler.analyze_solution(solution, i)
         print(f"Solution {i}: Energy Cost = {energy_cost:.2f}, Discomfort = {discomfort:.2f}")
+    
+    # Plot Gantt chart for the first non-dominated solution
+    if non_dominated_solutions:
+        device_starts, _, _ = scheduler.decode_individual(non_dominated_solutions[0])
+        energy_cost, discomfort= scheduler.analyze_solution(non_dominated_solutions[0], 1)
+        print(f"Solution 1: Energy Cost = {energy_cost:.2f}, Discomfort = {discomfort:.2f}")
+        plot_gantt_chart(device_starts, scenario.devices, 1, SCENARIO)
+        
+    # Plot solution distributions
+    energy_costs = [ind.fitness.values[0] for ind in non_dominated_solutions]
+    discomforts = [ind.fitness.values[1] for ind in non_dominated_solutions]
+    plot_solution_distributions(energy_costs, discomforts, non_dominated_solutions, scenario.devices)
