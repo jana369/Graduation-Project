@@ -2,3 +2,4 @@ deap
 numpy 
 pandas 
 matplotlib
+seaborn
