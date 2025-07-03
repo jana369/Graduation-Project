@@ -96,9 +96,9 @@ class StochasticSmartHomeScheduler:
         self.setup_deap()
 
     def setup_deap(self):
-        # Single-objective optimization (minimize discomfort only)
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-        creator.create("Individual", list, fitness=creator.FitnessMin)
+        # Multi-objective optimization (minimize energy cost and discomfort)
+        creator.create("FitnessMulti", base.Fitness, weights=(-1.0, -1.0))  # Minimize both objectives
+        creator.create("Individual", list, fitness=creator.FitnessMulti)
 
         for device in self.devices:
             self.toolbox.register(
@@ -122,7 +122,7 @@ class StochasticSmartHomeScheduler:
         self.toolbox.register("evaluate", self.evaluate_individual)
         self.toolbox.register("mate", self.custom_crossover)
         self.toolbox.register("mutate", self.custom_mutation)
-        self.toolbox.register("select", tools.selTournament, tournsize=3)
+        self.toolbox.register("select", tools.selNSGA2)  # Use NSGA-II for multi-objective optimization
 
     def decode_individual(self, individual: List[float]) -> Tuple[Dict[str, int], np.ndarray, int]:
         device_starts = {device.name: int(individual[i]) for i, device in enumerate(self.devices)}
@@ -244,25 +244,34 @@ class StochasticSmartHomeScheduler:
 
         return penalty, feasible
 
+    def calculate_energy_cost(self, P_grid: np.ndarray, P_sell: np.ndarray) -> float:
+        """Calculate energy cost"""
+        grid_cost = np.sum(self.energy_system.C_grid * P_grid)
+        renewable_cost = np.sum(self.energy_system.C_re * self.energy_system.P_re)
+        selling_revenue = np.sum(self.energy_system.R_sell * P_sell)
+        energy_cost = grid_cost + renewable_cost - selling_revenue
+        return energy_cost
+
     def calculate_discomfort(self, device_starts: Dict[str, int]) -> float:
         """Calculate discomfort as sum of delays from earliest start time"""
         discomfort = 0
         for device in self.devices:
             delay = device_starts[device.name] - device.start_time
-            discomfort += delay
+            discomfort += delay  # Linear discomfort based on delay
         return discomfort
 
-    def evaluate_individual(self, individual: List[float]) -> Tuple[float]:
-        """Evaluate individual for single objective: discomfort"""
+    def evaluate_individual(self, individual: List[float]) -> Tuple[float, float]:
+        """Evaluate individual for two objectives: energy cost and discomfort"""
         try:
             device_starts, battery_modes, ev_start = self.decode_individual(individual)
             X = self.create_device_schedule(device_starts)
             P_br, P_bi, P_grid, P_sell, E_b, Ptevb = self.solve_energy_balance(X, battery_modes, ev_start)
             penalty, feasible = self.check_constraints(X, device_starts, P_br, P_bi, P_grid, P_sell, E_b, Ptevb)
+            energy_cost = self.calculate_energy_cost(P_grid, P_sell)
             discomfort = self.calculate_discomfort(device_starts)
-            return (discomfort + penalty,)
+            return (energy_cost + penalty, discomfort + penalty)
         except Exception as e:
-            return (10000.0,)
+            return (10000.0, 10000.0)
 
     def custom_crossover(self, ind1: List[float], ind2: List[float]) -> Tuple[List[float], List[float]]:
         for i in range(len(self.devices)):
@@ -296,7 +305,7 @@ class StochasticSmartHomeScheduler:
         return (individual,)
 
     def run_single_optimization(self, pop_size: int = 200, generations: int = 500) -> List[float]:
-        """Run single optimization and return best solution"""
+        """Run single optimization and return best solution based on weighted sum"""
         pop = self.toolbox.population(n=pop_size)
         fitnesses = list(map(self.toolbox.evaluate, pop))
         for ind, fit in zip(pop, fitnesses):
@@ -324,7 +333,9 @@ class StochasticSmartHomeScheduler:
             
             pop[:] = offspring
         
-        best_ind = tools.selBest(pop, 1)[0]
+        # Select best individual based on weighted sum of objectives
+        w_energy, w_discomfort = 0.5, 0.5  # Weights for energy cost and discomfort
+        best_ind = min(pop, key=lambda ind: w_energy * ind.fitness.values[0] + w_discomfort * ind.fitness.values[1])
         return best_ind
 
 class StochasticAnalyzer:
@@ -335,7 +346,8 @@ class StochasticAnalyzer:
         self.ev = ElectricVehicle()
         
         self.all_solutions = []
-        self.all_discomforts = []
+        self.all_costs = []  # Energy costs
+        self.all_discomforts = []  # Discomfort values
         self.device_start_probabilities = {}
         self.battery_mode_probabilities = np.zeros((24, 3))
         self.ev_start_probabilities = np.zeros(24)
@@ -363,7 +375,8 @@ class StochasticAnalyzer:
                 device_starts, battery_modes, ev_start = scheduler.decode_individual(best_solution)
                 
                 self.all_solutions.append(best_solution.copy())
-                self.all_discomforts.append(best_solution.fitness.values[0])
+                self.all_costs.append(best_solution.fitness.values[0])
+                self.all_discomforts.append(best_solution.fitness.values[1])
                 self._update_probabilities(device_starts, battery_modes, ev_start)
                 valid_solutions += 1
                 
@@ -400,14 +413,23 @@ class StochasticAnalyzer:
         self.ev_start_probabilities /= num_valid_solutions
     
     def print_results(self):
-        """Print probability results for discomfort"""
+        """Print probability results including energy cost and discomfort"""
         print("\n" + "="*80)
-        print("STOCHASTIC OPTIMIZATION RESULTS (DISCOMFORT)")
+        print("STOCHASTIC OPTIMIZATION RESULTS")
         print("="*80)
+        
+        print(f"\nAverage Energy Cost: {np.mean(self.all_costs):.4f} ± {np.std(self.all_costs):.4f}")
+        print(f"Best Energy Cost: {np.min(self.all_costs):.4f}")
+        print(f"Worst Energy Cost: {np.max(self.all_costs):.4f}")
         
         print(f"\nAverage Discomfort: {np.mean(self.all_discomforts):.4f} ± {np.std(self.all_discomforts):.4f}")
         print(f"Best Discomfort: {np.min(self.all_discomforts):.4f}")
         print(f"Worst Discomfort: {np.max(self.all_discomforts):.4f}")
+        
+        # Weighted objective (for reference)
+        w_energy, w_discomfort = 0.7, 0.3
+        weighted_scores = [w_energy * cost + w_discomfort * discomfort for cost, discomfort in zip(self.all_costs, self.all_discomforts)]
+        print(f"\nAverage Weighted Objective (0.7*Cost + 0.3*Discomfort): {np.mean(weighted_scores):.4f} ± {np.std(weighted_scores):.4f}")
         
         print("\n" + "-"*60)
         print("DEVICE START TIME PROBABILITIES")
