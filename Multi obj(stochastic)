@@ -50,7 +50,7 @@ class StochasticEnergySystem:
         self.gamma = 20
         self.P_grid_max = 20
         self.P_sell_max = 4.0
-        
+
         # Base parameters (deterministic values)
         self.P_sun_base = np.array([0.0] * 6 + [0.1, 0.2, 0.3, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3, 0.2, 0.1] + [0.0] * 5)
         self.P_wind_base = np.array([0.3] * 6 + [0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.3] + [0.3] * 5)
@@ -58,7 +58,7 @@ class StochasticEnergySystem:
         self.C_grid_base = np.array([0.25, 0.20, 0.18, 0.15, 0.12, 0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.07, 0.10, 0.13, 0.16, 0.18, 0.20, 0.22, 0.25, 0.23, 0.21, 0.19, 0.17])
         self.R_sell_base = np.array([0.20, 0.15, 0.25, 0.05, 0.20, 0.06, 0.08, 0.10, 0.20, 0.10, 0.08, 0.20, 0.15, 0.12, 0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.18, 0.16, 0.14, 0.12])
         self.Pncl_base = np.array([1.5, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2, 0.1, 0.5, 0.8, 1.0, 1.3, 1.5, 1.7, 1.6, 1.4, 1.2, 1.0])
-        
+
         # Initialize with deterministic values first
         self.sample_stochastic_parameters()
 
@@ -126,12 +126,12 @@ class StochasticSmartHomeScheduler:
 
     def decode_individual(self, individual: List[float]) -> Tuple[Dict[str, int], np.ndarray, int]:
         device_starts = {device.name: int(individual[i]) for i, device in enumerate(self.devices)}
-        
+
         for dependent, prerequisite in self.precedence.items():
             prereq_end = device_starts[prerequisite] + next(d.duration for d in self.devices if d.name == prerequisite)
             max_start = next(d.end_time for d in self.devices if d.name == dependent) - next(d.duration for d in self.devices if d.name == dependent) + 1
             device_starts[dependent] = max(prereq_end, min(device_starts[dependent], max_start))
-        
+
         battery_modes = np.array(individual[len(self.devices):len(self.devices) + 24])
         ev_start = int(individual[-1])
         return device_starts, battery_modes, ev_start
@@ -183,7 +183,7 @@ class StochasticSmartHomeScheduler:
                     charge_amount = min(self.battery.P_br_max, self.battery.E_b_max - E_b[t])
                     P_br[t] = charge_amount
                     net_demand += charge_amount
-                    
+
             elif battery_modes[t] == 0.0:
                 if net_demand > 0 and self.energy_system.C_grid[t] > 0.15:
                     discharge_amount = min(net_demand, self.battery.P_bi_max, E_b[t])
@@ -226,12 +226,12 @@ class StochasticSmartHomeScheduler:
             if active_devices > self.energy_system.lambdaa:
                 penalty += (active_devices - self.energy_system.lambdaa) * 200
                 feasible = False
-            
+
             total_cel_load = sum(device.power * X[device.name][t] for device in self.devices)
             if total_cel_load > self.energy_system.gamma:
                 penalty += (total_cel_load - self.energy_system.gamma) * 100
                 feasible = False
-            
+
             if E_b[t] < 0 or E_b[t] > self.battery.E_b_max:
                 penalty += abs(E_b[t] - np.clip(E_b[t], 0, self.battery.E_b_max)) * 500
                 feasible = False
@@ -289,14 +289,14 @@ class StochasticSmartHomeScheduler:
             if random.random() < indpb:
                 max_start = device.end_time - device.duration + 1
                 individual[i] = random.randint(device.start_time, max_start)
-        
+
         for dependent, prerequisite in self.precedence.items():
             prereq_idx = next(i for i, d in enumerate(self.devices) if d.name == prerequisite)
             dep_idx = next(i for i, d in enumerate(self.devices) if d.name == dependent)
             prereq_end = individual[prereq_idx] + next(d.duration for d in self.devices if d.name == prerequisite)
             max_start = next(d.end_time for d in self.devices if d.name == dependent) - next(d.duration for d in self.devices if d.name == dependent) + 1
             individual[dep_idx] = max(prereq_end, min(individual[dep_idx], max_start))
-        
+
         for i in range(len(self.devices), len(self.devices) + 24):
             if random.random() < indpb:
                 individual[i] = random.choice([0.0, 0.5, 1.0])
@@ -314,27 +314,27 @@ class StochasticSmartHomeScheduler:
         for gen in range(generations):
             offspring = self.toolbox.select(pop, len(pop))
             offspring = [self.toolbox.clone(ind) for ind in offspring]
-            
+
             for i in range(1, len(offspring), 2):
                 if random.random() < 0.7:
                     self.toolbox.mate(offspring[i - 1], offspring[i])
                     del offspring[i - 1].fitness.values
                     del offspring[i].fitness.values
-            
+
             for i in range(len(offspring)):
                 if random.random() < 0.3:
                     self.toolbox.mutate(offspring[i], indpb=0.1)
                     del offspring[i].fitness.values
-            
+
             invalid_ind = [ind for ind in offspring if not hasattr(ind.fitness, "values") or not ind.fitness.values]
             fitnesses = list(map(self.toolbox.evaluate, invalid_ind))
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
-            
+
             pop[:] = offspring
-        
+
         # Select best individual based on weighted sum of objectives
-        w_energy, w_discomfort = 0.5, 0.5  # Weights for energy cost and discomfort
+        w_energy, w_discomfort = 0.7, 0.3  # Weights for energy cost and discomfort
         best_ind = min(pop, key=lambda ind: w_energy * ind.fitness.values[0] + w_discomfort * ind.fitness.values[1])
         return best_ind
 
@@ -344,14 +344,14 @@ class StochasticAnalyzer:
         self.devices = scenario.devices
         self.battery = Battery()
         self.ev = ElectricVehicle()
-        
+
         self.all_solutions = []
         self.all_costs = []  # Energy costs
         self.all_discomforts = []  # Discomfort values
         self.device_start_probabilities = {}
         self.battery_mode_probabilities = np.zeros((24, 3))
         self.ev_start_probabilities = np.zeros(24)
-        
+
         for device in self.devices:
             possible_starts = range(device.start_time, device.end_time - device.duration + 2)
             self.device_start_probabilities[device.name] = {start: 0 for start in possible_starts}
@@ -360,39 +360,39 @@ class StochasticAnalyzer:
         """Run stochastic analysis with specified number of iterations"""
         print(f"Starting stochastic analysis with {num_iterations} iterations...")
         print(f"Scenario: {len(self.devices)} devices with precedences: {self.scenario.precedences}")
-        
+
         valid_solutions = 0
-        
+
         for iteration in range(num_iterations):
-            if (iteration + 1) % 1000 == 0:
+            if (iteration + 1) % 10000 == 0:
                 print(f"Completed {iteration + 1}/{num_iterations} iterations...")
-            
+
             try:
                 energy_system = StochasticEnergySystem()
                 energy_system.sample_stochastic_parameters()
                 scheduler = StochasticSmartHomeScheduler(self.scenario, energy_system, self.battery, self.ev)
                 best_solution = scheduler.run_single_optimization(pop_size=30, generations=50)
                 device_starts, battery_modes, ev_start = scheduler.decode_individual(best_solution)
-                
+
                 self.all_solutions.append(best_solution.copy())
                 self.all_costs.append(best_solution.fitness.values[0])
                 self.all_discomforts.append(best_solution.fitness.values[1])
                 self._update_probabilities(device_starts, battery_modes, ev_start)
                 valid_solutions += 1
-                
+
             except Exception as e:
                 print(f"Error in iteration {iteration + 1}: {e}")
                 continue
-        
+
         print(f"Completed analysis. Valid solutions: {valid_solutions}/{num_iterations}")
         self._normalize_probabilities(valid_solutions)
-    
+
     def _update_probabilities(self, device_starts: Dict[str, int], battery_modes: np.ndarray, ev_start: int):
         """Update probability counters"""
         for device_name, start_time in device_starts.items():
             if start_time in self.device_start_probabilities[device_name]:
                 self.device_start_probabilities[device_name][start_time] += 1
-        
+
         for t, mode in enumerate(battery_modes):
             if mode == 0.0:
                 self.battery_mode_probabilities[t, 0] += 1
@@ -400,48 +400,50 @@ class StochasticAnalyzer:
                 self.battery_mode_probabilities[t, 1] += 1
             elif mode == 1.0:
                 self.battery_mode_probabilities[t, 2] += 1
-        
+
         self.ev_start_probabilities[ev_start] += 1
-    
+
     def _normalize_probabilities(self, num_valid_solutions: int):
         """Convert counts to probabilities"""
         for device_name in self.device_start_probabilities:
             for start_time in self.device_start_probabilities[device_name]:
                 self.device_start_probabilities[device_name][start_time] /= num_valid_solutions
-        
+
         self.battery_mode_probabilities /= num_valid_solutions
         self.ev_start_probabilities /= num_valid_solutions
-    
+
     def print_results(self):
         """Print probability results including energy cost and discomfort"""
         print("\n" + "="*80)
         print("STOCHASTIC OPTIMIZATION RESULTS")
         print("="*80)
-        
-        print(f"\nAverage Energy Cost: {np.mean(self.all_costs):.4f} ± {np.std(self.all_costs):.4f}")
+
+        print(f"\nAverage Energy Cost: {np.mean(self.all_costs):.4f} ")
         print(f"Best Energy Cost: {np.min(self.all_costs):.4f}")
         print(f"Worst Energy Cost: {np.max(self.all_costs):.4f}")
-        
-        print(f"\nAverage Discomfort: {np.mean(self.all_discomforts):.4f} ± {np.std(self.all_discomforts):.4f}")
+
+        print(f"\nAverage Discomfort: {np.mean(self.all_discomforts):.4f}")
         print(f"Best Discomfort: {np.min(self.all_discomforts):.4f}")
         print(f"Worst Discomfort: {np.max(self.all_discomforts):.4f}")
-        
+
         # Weighted objective (for reference)
         w_energy, w_discomfort = 0.7, 0.3
         weighted_scores = [w_energy * cost + w_discomfort * discomfort for cost, discomfort in zip(self.all_costs, self.all_discomforts)]
-        print(f"\nAverage Weighted Objective (0.7*Cost + 0.3*Discomfort): {np.mean(weighted_scores):.4f} ± {np.std(weighted_scores):.4f}")
-        
+        print(f"\nAverage Weighted Objective (0.7*Cost + 0.3*Discomfort): {np.mean(weighted_scores):.4f}")
+        print(f"Best Weighted Objective: {np.min(weighted_scores):.4f}")
+        print(f"Worst Weighted Objective: {np.max(weighted_scores):.4f}")
+
         print("\n" + "-"*60)
         print("DEVICE START TIME PROBABILITIES")
         print("-"*60)
-        
+
         for device in self.devices:
             print(f"\n{device.name} (Duration: {device.duration}h, Window: {device.start_time}-{device.end_time}):")
             probs = self.device_start_probabilities[device.name]
             for start_time, prob in sorted(probs.items()):
                 if prob > 0.01:
                     print(f"  Start at hour {start_time}: {prob:.3f} ({prob*100:.1f}%)")
-        
+
         print("\n" + "-"*60)
         print("BATTERY MODE PROBABILITIES")
         print("-"*60)
@@ -452,62 +454,122 @@ class StochasticAnalyzer:
             idle_prob = self.battery_mode_probabilities[t, 1]
             charge_prob = self.battery_mode_probabilities[t, 2]
             print(f"{t:2d}   | {discharge_prob:.3f}     | {idle_prob:.3f}    | {charge_prob:.3f}")
-        
+
         print("\n" + "-"*60)
         print("EV CHARGING START TIME PROBABILITIES")
         print("-"*60)
         for t in range(24):
             if self.ev_start_probabilities[t] > 0.01:
                 print(f"Start at hour {t}: {self.ev_start_probabilities[t]:.3f} ({self.ev_start_probabilities[t]*100:.1f}%)")
-    
+
     def plot_device_probabilities(self):
         """Plot device start time probabilities"""
         num_devices = len(self.devices)
         rows = (num_devices + 2) // 3
         fig, axes = plt.subplots(rows, 3, figsize=(15, 4 * rows))
         axes = axes.flatten() if num_devices > 1 else [axes]
-        
+
         for i, device in enumerate(self.devices):
             start_times = []
             probabilities = []
             for start_time, prob in sorted(self.device_start_probabilities[device.name].items()):
                 start_times.append(start_time)
                 probabilities.append(prob)
-            
+
             axes[i].bar(start_times, probabilities, alpha=0.7, color=f'C{i}')
             axes[i].set_title(f'{device.name}\n(Duration: {device.duration}h)')
             axes[i].set_xlabel('Start Time (hour)')
             axes[i].set_ylabel('Probability')
             axes[i].set_xticks(start_times)
             axes[i].grid(True, alpha=0.3)
-        
+
         for i in range(num_devices, len(axes)):
             axes[i].set_visible(False)
-        
+
         plt.tight_layout()
         plt.suptitle('Device Start Time Probabilities', fontsize=16, y=1.02)
         plt.show()
-    
+
     def plot_battery_probabilities(self):
         """Plot battery mode probabilities as a stacked bar chart"""
         fig, ax = plt.subplots(figsize=(15, 6))
-        
+
         hours = np.arange(24)
         discharge_probs = self.battery_mode_probabilities[:, 0]
         idle_probs = self.battery_mode_probabilities[:, 1]
         charge_probs = self.battery_mode_probabilities[:, 2]
-        
+
         ax.bar(hours, discharge_probs, label='Discharge', color='red', alpha=0.7)
         ax.bar(hours, idle_probs, bottom=discharge_probs, label='Idle', color='blue', alpha=0.7)
         ax.bar(hours, charge_probs, bottom=discharge_probs + idle_probs, label='Charge', color='green', alpha=0.7)
-        
+
         ax.set_title('Battery Mode Probabilities Over 24 Hours', fontsize=16)
         ax.set_xlabel('Hour of Day')
         ax.set_ylabel('Probability')
         ax.set_xticks(hours)
         ax.legend()
         ax.grid(True, alpha=0.3)
-        
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_demand_curve(self, device_starts: Dict[str, int], battery_modes: np.ndarray, ev_start: int, energy_system: StochasticEnergySystem):
+        """Plot the total demand curve over 24 hours"""
+        scheduler = StochasticSmartHomeScheduler(self.scenario, energy_system, self.battery, self.ev)
+        X = scheduler.create_device_schedule(device_starts)
+        _, _, P_grid, _, _, Ptevb = scheduler.solve_energy_balance(X, battery_modes, ev_start)
+
+        demand = np.zeros(24)
+        for t in range(24):
+            Pclr = sum(device.power * X[device.name][t] for device in self.devices)
+            demand[t] = Pclr + Ptevb[t] + energy_system.Pncl[t]
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        hours = np.arange(24)
+        ax.plot(hours, demand, label='Total Demand', color='purple', linewidth=2)
+        ax.set_title('Total Energy Demand Over 24 Hours', fontsize=16)
+        ax.set_xlabel('Hour of Day')
+        ax.set_ylabel('Demand (kW)')
+        ax.set_xticks(hours)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_energy_sources(self, device_starts: Dict[str, int], battery_modes: np.ndarray, ev_start: int, energy_system: StochasticEnergySystem):
+        """Plot energy consumption from each source over 24 hours"""
+        scheduler = StochasticSmartHomeScheduler(self.scenario, energy_system, self.battery, self.ev)
+        X = scheduler.create_device_schedule(device_starts)
+        _, P_bi, P_grid, _, _, _ = scheduler.solve_energy_balance(X, battery_modes, ev_start)
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        hours = np.arange(24)
+        ax.plot(hours, P_grid, label='Grid', color='blue', linewidth=2)
+        ax.plot(hours, energy_system.P_sun, label='Solar', color='orange', linewidth=2)
+        ax.plot(hours, energy_system.P_wind, label='Wind', color='green', linewidth=2)
+        ax.plot(hours, P_bi, label='Battery Discharge', color='red', linewidth=2)
+        ax.set_title('Energy Consumption by Source Over 24 Hours', fontsize=16)
+        ax.set_xlabel('Hour of Day')
+        ax.set_ylabel('Power (kW)')
+        ax.set_xticks(hours)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_costs_over_time(self, energy_system: StochasticEnergySystem):
+        """Plot costs and revenue over 24 hours"""
+        fig, ax = plt.subplots(figsize=(12, 6))
+        hours = np.arange(24)
+        ax.plot(hours, energy_system.C_re, label='Renewable Cost', color='green', linewidth=2)
+        ax.plot(hours, energy_system.C_grid, label='Grid Cost', color='blue', linewidth=2)
+        ax.plot(hours, energy_system.R_sell, label='Selling Revenue', color='red', linewidth=2)
+        ax.set_title('Costs and Revenue Over 24 Hours', fontsize=16)
+        ax.set_xlabel('Hour of Day')
+        ax.set_ylabel('Cost/Revenue ($/kWh)')
+        ax.set_xticks(hours)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.show()
 
@@ -520,12 +582,28 @@ def main():
         "Smart fan": "Air Conditioner",
     }
     scenario = Scenario(num_devices=12, precedences=precedences)
-    
+
     analyzer = StochasticAnalyzer(scenario)
     analyzer.run_stochastic_analysis(num_iterations=10000)
     analyzer.print_results()
     analyzer.plot_device_probabilities()
     analyzer.plot_battery_probabilities()
+
+    # Plot new visualizations for the best solution
+    w_energy, w_discomfort = 0.7, 0.3
+    weighted_scores = [w_energy * cost + w_discomfort * discomfort for cost, discomfort in zip(analyzer.all_costs, analyzer.all_discomforts)]
+    best_idx = np.argmin(weighted_scores)
+    best_solution = analyzer.all_solutions[best_idx]
+
+    energy_system = StochasticEnergySystem()
+    energy_system.sample_stochastic_parameters()
+    scheduler = StochasticSmartHomeScheduler(scenario, energy_system, analyzer.battery, analyzer.ev)
+    device_starts, battery_modes, ev_start = scheduler.decode_individual(best_solution)
+
+    print("\nVisualizing Best Solution (based on weighted objective: 0.7*Cost + 0.3*Discomfort)")
+    analyzer.plot_demand_curve(device_starts, battery_modes, ev_start, energy_system)
+    analyzer.plot_energy_sources(device_starts, battery_modes, ev_start, energy_system)
+    analyzer.plot_costs_over_time(energy_system)
 
 if __name__ == "__main__":
     main()
