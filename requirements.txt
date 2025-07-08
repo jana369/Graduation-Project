@@ -1,3 +1,5 @@
+cplex
+docplex
 deap
 numpy 
 pandas 
